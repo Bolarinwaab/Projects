@@ -1,0 +1,221 @@
+- [Morgan] Hi, everyone. This is a video where
+I'm going to walk through how to build a POC for
+this first week's solution. So you don't have to do this,
+but if you would like to, we are going to include some instructions where you can take up the challenge to build a POC like this in your own AWS account, if you wish. So this course is mostly going to be theoretical, conceptual, but we wanted to give you the option of building this out, if you wanted to. So let's go ahead and get started. First, what we need to do is create some different
+IAM policies and roles. So let's go ahead and
+navigate to the IAM console and select IAM. And I have already built these out, but I want to show you what they look like so that you can follow along as well. And like I said, we will include
+these instructions as well. So the first one that I want to show is this Lambda-DynamoDBStreams-Read. So if you think about our architecture, we have API Gateway
+pushing a message to SQS. Lambda then reads the message off of SQS, writes to a DynamoDB table, which pushes that
+information into a stream. A second Lambda function
+reads that information off of the stream and then
+publishes the message to SNS. So let's actually start with
+this Lambda-Read=SQS policy. And you can see here we have the API calls that are necessary for this Lambda function to read from SQS. We have DeleteMessage, ReceiveMessage, GetQueueAttributes, and
+ChangeMessageVisibility. So these are all the API calls that Lambda needs to read from that queue. Next, we also have Lambda-Write-DynamoDB. This policy will also
+be attached to a role that will be used by the Lambda function to write to DynamoDB
+once it reads the message off of the queue. So for this policy, we have the actions as PutItem and DescribeTable. Now that's all of the permissions that that Lambda function needs. The second Lambda function needs to read from DynamoDB
+Streams and write to SNS. So let's first read the
+Lambda-DynamoDBStreams-Read policy. And you can see here we
+have these four API calls, GetShardIterator, DescribeStream, ListStreams and GetRecords. And then for the writing to SNS, we have the policy Lambda-SNS-Publish, which includes the API calls Publish, GetTopicAttributes and ListTopics. So these are all customer managed policies that you can see here. And then there are also
+AWS managed policies. So it's good to know the difference between the two of those. Customer managed policies are
+going to be managed by you, whereas AWS managed
+policies are managed by AWS. So what that means is, for example, if we have something like
+AWS Marketplace Full Access, if you expand this, you can see that it includes
+all of the API calls that are needed for
+this particular service. If there was a new feature that came out, AWS would update this policy, whereas these are custom policies up here, so if we needed an extra API call here to use a different feature, we would have to go in there
+and edit this ourselves. All right, next, we need to
+attach these policies to roles, which again, I have already done. So we have some roles
+we're going to be using. One of them is APIGateway-SQS, and this role, if I click on this, I'm going to go ahead and copy the ARN and paste that into a text
+editor that I have off the side. We're going to be using the ARNs for these roles in upcoming steps, and you can see the policies
+that exist for these as well. So for this one, we have this policy that allows API Gateway to
+push to CloudWatch Logs, and this is an AWS managed policy. Now let's go ahead and
+go back to the roles. And then for our next role, I want to look at this
+Lambda-SQS-DynamoDB. This includes the policies
+for Lambda-Read-SQS, which we just looked at, Lambda-Write-DynamoDB,
+which we also looked at. And then we have this
+LambdaBasicExecutionRole, which allows the Lambda function to write to CloudWatch Logs. So we can go ahead and
+collapse these policies. And then I want to copy
+the ARN for this role and paste that into a text
+editor in another screen. Now back to the roles screen here. Let's go ahead and grab the next role, which is Lambda-DynamoDBStreams-SNS. I'm going to go ahead and
+copy the ARN for this one and then I want to paste
+that off on another screen. And for the policies for this one, we have this Lambda function, can read from DynamoDB Streams, it can publish to SNS, and it also has that basic execution role, which will allow this function
+to write to CloudWatch Logs. All right, so that is all the roles that we need for this solution. So next, let's go ahead
+and create our SQS queue. Type in SQS and then select
+Simple Queue Service. And then click Create Queue. And from here you can select
+the type of queue you want, standard or FIFO. We're going to select Standard, and then we're going to name
+this POC Q-U-E-U-E, queue. And then we're going to accept all the default configurations. If you're planning on taking the exam, I would make sure that you understand what each of these configurations
+is for and what they do. But for now we're going to
+go ahead and scroll down, accept the defaults, and then what we need to
+change is this access policy. So this access policy will determine who's allowed to write to the queue and who's allowed to receive
+messages from the queue. So if you remember our architecture, API Gateway is going to be
+publishing messages to the queue. So you want to paste the ARN for the role that API Gateway is going to use here so that we define who can send
+the messages to the queue. This role, APIGateway-SQS. Now who can receive
+messages from the queue? We want that to be our
+first Lambda function. So I'm going to go ahead and grab the ARN for Lambda-SQS-DynamoDB
+and paste that here. And then you can scroll through
+here if you would like to and you can read through
+this access policy in JSON. So now we're going to scroll
+down and click Create Queue. Now our queue has been created, I'm going to copy the ARN for this queue, and then I'm going to
+paste it in my text editor so I can use it later. Now, let's go ahead to DynamoDB
+and select DynamoDB here. And I'm just going to
+double check to make sure that I am still in North Virginia so that everything's being
+created in the same account. And then I'm going to go
+ahead and click Create Table. And here we want to
+give this table a name. And I have the instructions
+open in another screen, so that's how I'm remembering each of these little things here. So the table name is going to be 'orders'. Partition Key we will say is OrderID. Then we can scroll down, keep all the default settings
+and click Create table. All right, so now that
+we have our SQS queue and we have our DynamoDB table, we need to create our Lambda function. So I'm going to go to the Lambda
+service and select Lambda. And then I want to click Create Function. And from here I want
+to Author from scratch, give this function a name, POC-Lambda-1. And then for the runtime, I'm
+going to select Python 3.9. And then for the permissions, I'm going to change the
+default execution role and I want to use an existing role. And then I want to select
+this Lambda-SQS-DynamoDB, and then click Create Function. All right, our function
+has now been created. We need to now add a trigger. So the SQS queue is going to be the
+trigger for our function. So we add a trigger, and then
+we want to select a source, type in SQS, select SQS, and
+then select the POC-Queue. And then we can just click Add. All right, so now we have the triggers set up for this queue. The next thing that we need
+to do is modify the code. So right now, this code is
+just basically a blank stub that just says "Hello from Lambda!". I'm going to copy in,
+copy and paste some code that we have pre-written for you for this. And this code imports Boto3, which is the Python SDK for AWS. And then we're setting up
+the clients for DynamoDB and Orders for the table. So the client, this is going to be how you interact with DynamoDB. Then you can see we're saying client, which is DynamoDBClient.table for this specific table called Orders. And then we have this table object here. And then what we're doing is we're processing all of the records in the incoming event, so there's going to be a payload
+passed into this function. And then we're doing a little print just to test to make sure that it worked. You could take this out if you wanted to. And then we are setting the payload is going to be the body of
+the message that came in. I'm doing another print here again just to make sure that it worked and you can see that in logs
+if you wanted to do that. And then I'm calling table.put_item. We're creating a UUID for that order ID and then including the order information, the payload off of the request. So I'm going to go ahead and click Deploy. And then what I want to do next is create a test event
+in the Lambda console. So I'm copying some information
+from the instructions. Then we'll go ahead and click Test and we want to create a new test event. We'll just call this test. And then you can go ahead and paste in the information from the instructions. I clicked format JSON to make
+it look a little bit prettier. So we should see incoming
+order information. We'll go here and then we'll
+go ahead and click Save. And then from here, if we click Test, we should be able to see that our- We have test incoming order
+information over here. That's that printing that I was saying, that I had those print statements here. So we can see that it did run. But now if we want to verify that this actually wrote to DynamoDB the way that we would anticipate, we can go back to
+DynamoDB, select DynamoDB, click on Tables, select the Orders table, go to Explore Table Items, and then we can go ahead and
+see that we have our order here with that information that we sent in from that test payload. Now that test payload was mocking what the payload would look
+like if it came from SQS. So we're mocking the structure of what SQS will pass
+to that Lambda function. All right, so next what I want
+to do on this DynamoDB table is I want to click back here to DynamoDB, back to Tables, select this Orders table, and then select the
+Exports and Streams tab and then scroll down. We want to enable stream details. And then what we want to do is you want to select new and old images. Or actually, let's just do new image. We'll do the new image whenever
+you enable the streams. So what that means is
+what version of the items do you want to push onto the stream? So do you want just the key attributes? You might use this if you
+have like a large body. Then you might want to just have the key where then it can go look up the payload, maybe the payload's somewhere else. Maybe it lives in S3,
+maybe it's in DynamoDB, just depends on the size. We're going to go ahead
+and select New Image. And so this will include all
+of the information on that item once it's published or added to the table. So we'll go ahead and
+click Enable Stream here. So now we can see DynamoDB
+Streams is enabled. And the next thing that I want to do is I want to create our SNS topic. So I'm going to go ahead and
+navigate to SNS, select SNS, and then I'm going to go ahead
+and give this topic a name. We can type in POC-Topic,
+and then click Next Step. And we're going to go ahead
+and select Standard here. And you can see that we have a difference in subscription protocols. So SQS, Lambda, HTTP, SMS, email, mobile application is
+supported by Standard, whereas for FIFO, it's only SQS. So we're going to be testing
+that this works via email, so you want to make sure that you're selecting Standard here. All right, so we're going to
+select all of the defaults here except for the access policy. So this looks very familiar to SQS, right? So now we're looking at who can publish messages to the topic. What I'm going to do is select this Advanced radio button here, and then we're just going
+to edit this JSON directly. So what I want to do is let's go ahead and read through this really quick. We have allow star and then
+that's going to allow people, anybody to publish to
+this particular SNS topic. So what I want to do is
+I want to change this to instead reference the ARN of the role that the Lambda function
+is going to be using to publish to this particular topic. So let's go ahead and scroll down, and then we should be able
+to click Create topic. All right, so now let's
+go ahead to Topics. And then if we select POC-Topic, we can now create a subscription. So you want to go ahead and
+create a subscription here. And for this subscription,
+you would want to use email. And then you can put your
+email address in here. I'm not going to do that right now based off of just the
+protection of my email address, but this is where you
+would put in your email. You also could put in
+your phone number here. So it depends on where
+you are in the world on how this is going to work. So this works for US destinations, which is why we're going to
+go ahead and select Email, so that way you can
+put your email in here. Okay, so I'm going to come
+back once I've set up my email, so you'll see me again in just a second. Okay, so now we have our topic created. I'm going to go ahead and
+copy the ARN of this topic. And then I'm going to create
+the second Lambda function. So let's go back to the
+Lambda console, select Lambda. And now let's create a new function and let's call this one POC-Lambda-2. And then we're going to select that Python 3.9 runtime again, we're going to change the
+default execution role to use an existing role. And this time we want to select
+Lambda-DynamoDBStreams-SNS, and then click Create Function. All right, so now what we want to do is we want to go ahead and add a trigger. And then for this trigger
+we want to use DynamoDB and we want to select our Orders table and then we can go ahead and click Add. Okay, so now we have our
+DynamoDB table set up as the trigger for this function. Next, we will click on the Code tab and then I'm going to copy and paste the code in from the instructions, so let's go ahead and do that. Now here you can see that we're
+setting up a client for SNS, and then we are going to be taking the records that were passed in from DynamoDB Streams. And then we are going to
+say if this was an insert, meaning it was a new item, then we're going to grab the information from that new image. So now you can see why it was important that we use that new image flag for enabling DynamoDB Streams, because we are calling on that attribute directly in this code. And then we are calling client.publish, and then you have to fill in here where are we publishing the message? So client.publish. Publish is the API call
+that we're sending to SNS. TargetArn, where are we
+publishing this message? Message, what is the
+message we are publishing? And then MessageStructure, what shape is this message in? Which it's going to be JSON. So let's go ahead and paste
+in the ARN for our topic here and then we should be
+able to deploy this code. All right, so now what we want to do is we can create the API Gateway and then we can test if this
+whole thing works from there. So let's go scroll up and
+then we can go to API Gateway, select API Gateway, and then
+I want to build a REST API. So I'm going to go ahead
+and click Build for REST API and then click Okay. And now I want to create a new API, so brand new slate and I
+want to call this POC-API. And then I'm going to click Create API. All right, so you can see now
+we have basically a blank API. We need to set up our
+methods and our resources. So what I want to do first
+is I'm going to create a resource and let's go ahead and call this Order and then create the resource. And then under here, I want
+to click Create Method. And we're going to do a
+POST because theoretically, there would be a front end sending an HTTP post to a back end with the path /order
+that would come in here. So now what I'm going to do is I'm going to select
+AWS Service for the API because API Gateway has
+a direct integration between API Gateway and
+different AWS services. So we're going to use that
+API integration with SQS. So next what we need to
+do is select the region, which we want to use North Virginia here. So I'm going to type in us-east-1. And then for the AWS
+service, we want to use SQS, so we should be able to see that here. There you go. And then we're going to leave
+the AWS Subdomain blank. We're going to select the
+HTTP method to be a post. So the reason for that is because API Gateway is going to be posting a message directly to SQS. So then we want to go ahead and select the path override. And from here, what we want
+to do for the path override is we want to actually provide the, a pointer to the queue. So the way that we're going to do that is you type in your account name and then, or the account number, and then slash the name of your queue. So I just grabbed this
+off of the end of the ARN and then just changed
+the colon to a slash, and that's what we need there. So next, for the execution role, this is going to be using that IAM role that we had created in the first step, so I'll go ahead and paste that here. And then I'm just double checking to make sure that everything looks good according to the instructions, and it does look like
+we have everything ready so I'm going to go ahead
+and click Save here. All right, so now we're going to go back to this integration request, and then under HTTP Headers,
+I want to add a header. And for this one I want
+to call it Content-Type. And then Mapped From, it's single quote
+application/x-www-form-urlencoded, application/x-www-form-urlencoded, and then single quote. So then I'm going to go ahead and click the Save button here. And then we want to scroll
+down to Mapping Templates, and from here I want to select Never and then I want to add a mapping template, give it the type application/json, click on the checkbox and
+then we can go down here. And what we need to type in down here, you can copy and paste
+this from the instructions. So it's going to go
+ahead and state Action, and this is written in VTL. So we're essentially
+transforming the payload so that it can interact
+with the SQS APIs directly. So SendMessage and MessageBody equals dollar input.body. So again, make sure you're
+double checking things as you're going along here. There's a lot of little
+pieces that can go wrong. So we have action equals
+SendMessage and MessageBody equals dollar input.body. So again, we are taking
+the payload of the request and we are creating a string. We're creating the language that the SQS API is going to understand so that we can integrate
+these two things directly. So now I'm going to go
+ahead and click Save. Make sure you're clicking Save
+here, that's very important. And then we're going to go ahead and click Back to Method Execution. And now what we can do is
+we can actually test this from the API Gateway console here. So you click Test and then
+down to the request body, add in some information that would, that's like it's coming
+in off of an order. So we have item, latex
+gloves, customer ID 12345. I'm going to go ahead and click Test. And then over here on the left hand side, we can read the logs. So we can see sending
+requests to that queue. And then we received
+the response status 200, which means that it did send. So one fast way to check
+this is did you get an email? Did you actually receive the email? And then if you did, you'll know that it went
+through the entire thing. So let me come back and check
+my email and see if I got it. One second. All right, so I did go ahead and confirm that I do have the email, but we can also go check
+the DynamoDB table, see if it got that far. So for troubleshooting, something you can do is
+like check each step, like we just saw that we got
+the 200 response from SQS, but that doesn't guarantee that the first Lambda function
+read it from the queue and then wrote it to the DynamoDB table. So we're going to go
+ahead and check the table to see if the information is there. If we go to Explore Items or we can then, we can see our item is right here. So we know that the integration between SQS and Lambda is working. Now, I did get the email, so I know this thing is
+working all the way through, but if you didn't get the email, I would go about it that way. First, check the logs
+between API Gateway and SQS. Are you seeing that 200 response? If you are, next, come
+look at the DynamoDB table. Is your item here? If it isn't, then that means
+that you likely have an issue with the Lambda function between SQS. The Lambda function isn't
+actually reading from SQS, or maybe it's not writing to DynamoDB. Most of the time, these
+are permissions problems if you are having issues. And then if, let's say,
+that you have the item here, but it's not in your email, then the next place I would check is the second Lambda function. Is it able to read from
+the DynamoDB Stream? Is your DynamoDB Stream
+configured correctly? And then if it is, does
+your Lambda function then have the correct permissions
+to publish to SNS, right? Did you make sure your
+email is typed correctly is another another easy one. All right, so we know
+that this is working now. I did get the email. So what we want to do now is
+go ahead and delete everything. All right, so let's go
+ahead and delete everything. I'm going to delete the table first. Type in delete, click Delete Table. All right, and then let's
+go to our Lambda functions. Lambda. And then I'm going to
+select all my functions and I'm going to delete them. We can type in delete, click Delete, close this, looking good. Now let's go to API Gateway. And then from here, I'm going
+to select that API Gateway that I created and then delete it. And next, let's go to SQS. And from here I'm going
+to select SQS queue and click Delete. And just as I'm cleaning this up, if you want to do like a
+real challenge for yourself, I would recommend trying
+to do this entire lab using either the AWS CLI
+or using CloudFormation. So instead of doing everything
+in a point and click fashion, challenge yourself to do
+infrastructure as code, or to even try to just use the CLI. Just do something that you wouldn't usually think about doing. All right, so we have the
+DynamoDB table's been deleted, which deletes the stream. We have both Lambda functions are deleted, SNS has been deleted,
+SQS has been deleted, so has API Gateway, so
+I think we are all set. All right, Good luck.

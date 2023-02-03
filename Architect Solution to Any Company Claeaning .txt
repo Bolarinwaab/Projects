@@ -1,0 +1,45 @@
+- [Morgan] Great news. We are ready to present our solution for the order service to our customer. Now, it's good to remember, before we get into our customer meeting, that this initial design
+will likely change as the solution is implemented and more requirements come to light. I, personally, have never been on a software or IT-related project that didn't change as it went along. There are still many unknowns at this point in the process. That being said, we have
+a really great solution that meets the current requirements, and I think our customer will
+be excited to move forward with building it out. And the next phase for this
+would also likely involve building a proof of
+concept for our customer. Let's go ahead and give them a call. (phone ringing) - [Raf] Hello, Morgan. I hear you have our solution designed. I'm looking forward to see it. - [Morgan] Yes, I do. Let me go ahead and share it with you. Let's dive in. I approach this as a greenfield service, knowing that you are open to
+totally rewriting the code. So with that in mind, try to forget about the way
+things are currently done, and instead let's focus on this solution and how it will meet your requirements. - [Raf] All right, great. - [Morgan] Okay. So you have the frontend
+clients making requests, sending in orders through their
+phones, browsers, et cetera. All these requests are
+going to be directed to Amazon API Gateway, which acts as the front door for your API. API Gateway will handle the
+authentication for the request, and it will also validate the format of the incoming request to verify that all the necessary fields are included in the
+payload of the request. Once it passes through the
+authentication and validation, API Gateway will then send
+the message to an SQS queue. The message will remain in the queue until an AWS Lambda function is spun up to process the message. This happens quickly,
+and it's all automated because there is a polling
+mechanism built into AWS Lambda that will read the
+messages from the queue. Putting SQS between API Gateway and Lambda is decoupling the API from compute. So that way, if you have
+a large scaling event and you reach any predefined
+limits for the Lambda, the messages will be in the
+queue and will not be lost. Then, Lambda can churn through
+the messages and catch up. Or to catch up even faster, you can raise your Lambda limits and process the messages
+that are in the queue. Now, for the Lambda function. This Lambda function will
+contain the application code for the order service
+related to order processing and storing the orders. The orders will be stored
+in an Amazon DynamoDB table. Once an order is stored in the table, an entry gets added to
+the DynamoDB stream, which then will need to be processed to send the order to the
+downstream functions. This is where another Lambda
+function comes into play. And this Lambda function will read the information
+on the DynamoDB stream and publish the order
+information to Amazon SNS. SNS, then following a fan-out pattern that will send that message to all of the subscribed endpoints. Those endpoints being the
+three downstream services for fulfillment,
+accounting, and inventory. - [Raf] Wow! Okay, this looks awesome. But I have a question for you. What about monitoring and logging? - [Morgan] Yeah, so all of these services are serverless in nature, and have built-in integrations
+to send metrics and logs to Amazon CloudWatch and
+Amazon CloudWatch Logs. - [Raf] Right. It's good to hear that we won't need to do a ton of extra configuration to that, get working and in place. What about scaling? Is everything here using managed scaling? - [Morgan] Yes, so the
+scaling is all managed for these services. Though, for some of them, you can set limits or rates, like scaling with Lambda or managing the throughput for DynamoDB. So, you can still control scaling events, but it's much more hands-off than when you compare it to
+services like EC2, for example. - [Raf] Cool. Yeah, that's a relief. Hopefully, I won't get paged for outages anymore
+(chuckles) when we have sales in our store. That was always the worst. Like being excited for
+a sales event to happen, only for our infrastructure to fail when we needed it most, right? - [Morgan] Yeah, I
+totally understand that. Now, for your other
+requirements that we went over, we designed this with decoupling
+components, top of mind, and with services that scale in when you are no longer using them to optimize for cost and
+for performance efficiency. So overall, I think you're
+going to be really happy with operating this solution over time. - [Raf] Thank you so much. I can't wait to take this back to the team and show them what we
+will be working next. - [Morgan] You're welcome. And I am sure we'll be chatting soon as you begin to dive into the details on how all of this will actually work.
